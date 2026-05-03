@@ -30,7 +30,7 @@ func New(cfg Config) *Server {
 		w.Write([]byte("ok"))
 	})
 
-	handler := middleware.Logging(cfg.Logger)(mux)
+	handler := middleware.Recovery(cfg.Logger)(middleware.Logging(cfg.Logger)(mux))
 
 	return &Server{
 		httpServer: &http.Server{
