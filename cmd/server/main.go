@@ -3,10 +3,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/maxdeekay/nook/internal/server"
 )
@@ -28,9 +32,32 @@ func main() {
 		Logger: logger,
 	})
 
-	// net/http returns http.ErrServerClosed as a signal to indicate clean shutdown
-	if err := srv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Error("server failed", "err", err) // "message", "key", value
+	serverErrors := make(chan error, 1)
+	go func() {
+		if err := srv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
+	}()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		logger.Error("server error", "err", err)
 		os.Exit(1)
+
+	case sig := <-shutdown:
+		logger.Info("shutdown signal received", "signal", sig.String())
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(ctx); err != nil {
+			logger.Error("graceful shutdown failed", "err", err)
+			os.Exit(1)
+		}
+
+		logger.Info("server stopped")
 	}
 }

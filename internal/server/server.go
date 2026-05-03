@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,4 +46,9 @@ func New(cfg Config) *Server {
 func (s *Server) Start() error {
 	s.logger.Info("server starting", "addr", s.httpServer.Addr)
 	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info("server shutting down")
+	return s.httpServer.Shutdown(ctx)
 }
