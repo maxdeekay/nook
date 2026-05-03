@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 
@@ -30,6 +31,17 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
+
+	indexTmpl := template.Must(template.ParseFiles("web/templates/index.html"))
+
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		// Render template to w, 2nd argument is data available inside template
+		if err := indexTmpl.Execute(w, nil); err != nil {
+			cfg.Logger.Error("template render failed", "err", err)
+		}
+	})
+
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	handler := middleware.Recovery(cfg.Logger)(middleware.Logging(cfg.Logger)(mux))
 
