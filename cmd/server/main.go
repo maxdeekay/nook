@@ -3,7 +3,10 @@
 package main
 
 import (
-	"log"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
 
 	"github.com/maxdeekay/nook/internal/server"
 )
@@ -16,9 +19,18 @@ import (
 // Printf (formatted with %s, %d etc)
 
 func main() {
-	srv := server.New(server.Config{Port: 8080})
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 
-	if err := srv.Start(); err != nil {
-		log.Fatal(err)
+	srv := server.New(server.Config{
+		Port:   8080,
+		Logger: logger,
+	})
+
+	// net/http returns http.ErrServerClosed as a signal to indicate clean shutdown
+	if err := srv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Error("server failed", "err", err) // "message", "key", value
+		os.Exit(1)
 	}
 }
